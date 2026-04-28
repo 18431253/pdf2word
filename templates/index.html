@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>PDF 转 Word</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0f0f1a;color:#cdd6f4;height:100vh;overflow:hidden}
+.layout{display:flex;height:100vh}
+.panel-left{width:440px;min-width:440px;border-right:1px solid #2d2d4e;background:#0f0f1a;overflow-y:auto}
+.panel-left-inner{padding:24px 20px}
+h1{font-size:20px;font-weight:800;color:#c9b1ff;margin-bottom:2px}
+.subtitle{font-size:11px;color:#6b6b9a;margin-bottom:14px}
+.slabel{font-size:10px;font-weight:700;color:#7b9cff;text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.drop-zone{border:2px dashed #2d2d4e;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#12122a;position:relative;margin-bottom:14px}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-zone:hover,.drop-zone.dragover{border-color:#7b9cff;background:#16163a}
+.drop-zone.has-file{border-color:#6ee7b7;background:#0d1f1a}
+.drop-icon{font-size:22px;margin-bottom:3px}
+.drop-label{font-size:12px;color:#a0a0c8;font-weight:500}
+.drop-hint{font-size:10px;color:#4a4a6a;margin-top:2px}
+.file-name{font-size:10px;color:#6ee7b7;font-weight:600;margin-top:3px;word-break:break-all}
+.mode-group{display:flex;gap:8px;margin-bottom:14px}
+.mode-card{flex:1;border:2px solid #2d2d4e;border-radius:8px;padding:9px;cursor:pointer;transition:all .2s;background:#12122a}
+.mode-card:hover{border-color:#7b9cff}
+.mode-card.active{border-color:#c9b1ff;background:#1e1040}
+.mode-card input{display:none}
+.mode-title{font-size:11px;font-weight:700;color:#e0e0ff;margin-bottom:2px}
+.mode-desc{font-size:10px;color:#6b6b9a;line-height:1.3}
+#ref-section{display:none;margin-bottom:14px}
+#ref-section.visible{display:block}
+.row{display:flex;gap:6px;margin-bottom:14px;align-items:center}
+.text-input{flex:1;background:#12122a;border:1px solid #2d2d4e;border-radius:7px;padding:7px 10px;color:#cdd6f4;font-size:12px;outline:none;transition:border-color .2s}
+.text-input:focus{border-color:#7b9cff}
+.text-input::placeholder{color:#4a4a6a}
+.btn-sm{background:#1e1e3a;border:1px solid #2d2d4e;border-radius:7px;color:#a0a0c8;font-size:11px;padding:7px 11px;cursor:pointer;white-space:nowrap;transition:all .2s}
+.btn-sm:hover{background:#2d2d4e;color:#cdd6f4}
+.all-align-btn{flex:1;background:#1e1e3a;border:1px solid #7b9cff;border-radius:7px;color:#7b9cff;font-size:11px;font-weight:700;padding:8px 4px;cursor:pointer;transition:all .2s;text-align:center}
+.all-align-btn:hover{background:#7b9cff;color:#0f0f1a}
+.convert-btn{width:100%;padding:12px;background:linear-gradient(135deg,#7b9cff,#c9b1ff);color:#0f0f1a;border:none;border-radius:9px;font-size:14px;font-weight:800;cursor:pointer;transition:opacity .2s,transform .1s}
+.convert-btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+.convert-btn:disabled{opacity:.3;cursor:not-allowed}
+.status{margin-top:10px;text-align:center;font-size:11px;min-height:15px;color:#6b6b9a}
+.status.error{color:#ff6b8a}
+.status.success{color:#6ee7b7}
+.spinner{display:inline-block;width:11px;height:11px;border:2px solid #2d2d4e;border-top-color:#c9b1ff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar{height:3px;background:#2d2d4e;border-radius:2px;margin-top:8px;overflow:hidden;display:none}
+.progress-bar.visible{display:block}
+.progress-fill{height:100%;background:linear-gradient(90deg,#7b9cff,#c9b1ff);border-radius:2px;animation:prog 1.8s ease-in-out infinite}
+@keyframes prog{0%{width:0%;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0%;margin-left:100%}}
+.download-btn{display:none;width:100%;margin-top:8px;padding:10px;background:linear-gradient(135deg,#34d399,#6ee7b7);color:#0f1f1a;border:none;border-radius:9px;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;text-align:center;transition:opacity .2s}
+.download-btn:hover{opacity:.9}
+.download-btn.visible{display:block}
+.panel-right{flex:1;display:flex;flex-direction:column;background:#13131f;overflow:hidden;min-width:0}
+.preview-toolbar{padding:8px 14px;border-bottom:1px solid #2d2d4e;display:flex;align-items:center;gap:5px;flex-wrap:wrap;background:#0f0f1a;flex-shrink:0}
+.tb-label{font-size:10px;color:#4a4a6a;text-transform:uppercase;letter-spacing:.5px}
+.tb-btn{background:#1e1e3a;border:1px solid #2d2d4e;border-radius:5px;color:#a0a0c8;font-size:12px;padding:4px 8px;cursor:pointer;transition:all .15s;min-width:26px;text-align:center;line-height:1.4}
+.tb-btn:hover{background:#2d2d4e;color:#cdd6f4}
+.tb-btn.active{background:#c9b1ff;color:#0f0f1a;border-color:#c9b1ff}
+.tb-btn:disabled{opacity:.3;cursor:not-allowed}
+.tb-sep{width:1px;height:18px;background:#2d2d4e;margin:0 3px;flex-shrink:0}
+.tb-select{background:#1e1e3a;border:1px solid #2d2d4e;border-radius:5px;color:#a0a0c8;font-size:11px;padding:4px 7px;cursor:pointer;outline:none}
+.zoom-label{font-size:11px;color:#6b6b9a;min-width:34px;text-align:center}
+.preview-body{flex:1;overflow-y:auto;padding:24px;background:#1a1a2e;position:relative}
+.preview-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#3a3a5c;gap:10px}
+.preview-empty-icon{font-size:36px}
+.preview-empty-text{font-size:13px}
+.compare-wrap{display:flex;gap:0;height:100%}
+.compare-col{flex:1;overflow-y:auto;padding:24px;min-width:0}
+.compare-col:first-child{border-right:2px solid #2d2d4e}
+.compare-col-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding:4px 8px;border-radius:4px;display:inline-block}
+.label-original{background:#1e1e3a;color:#7b9cff}
+.label-template{background:#1e3a1e;color:#6ee7b7}
+.preview-zoom-wrap{transform-origin:top center;transition:transform .2s}
+.preview-page{background:white;color:#1a1a1a;padding:1in;margin:0 auto 20px;box-shadow:0 4px 20px rgba(0,0,0,.5);border-radius:3px;width:8.5in;min-height:4in;font-family:"Times New Roman","SimSun",serif;font-size:12pt;line-height:1.6;position:relative;user-select:none}
+.preview-page.editing-mode{user-select:text}
+.preview-page ::selection{background:rgba(123,156,255,.3)}
+.preview-page[contenteditable]{outline:none}
+.block-h1{font-size:24px;font-weight:800;margin:.4em 0 .2em;line-height:1.3;border-radius:3px;padding:1px 3px}
+.block-h2{font-size:18px;font-weight:700;margin:.35em 0 .15em;line-height:1.3;border-radius:3px;padding:1px 3px}
+.block-p{font-size:12pt;margin:.15em 0;line-height:1.6;border-radius:3px;padding:1px 3px}
+.block-selected{background:rgba(123,156,255,.18)!important;outline:1px solid rgba(123,156,255,.5)}
+.preview-page.template-view{pointer-events:none}
+.drag-sel-box{position:fixed;border:1px dashed #7b9cff;background:rgba(123,156,255,.08);pointer-events:none;z-index:9999}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2d2d4e;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="layout">
+<!-- LEFT -->
+<div class="panel-left"><div class="panel-left-inner">
+  <h1>PDF 转 Word</h1>
+  <p class="subtitle">支持文字、扫描件、表格、图片及中文内容</p>
+  <div class="slabel">全文统一对齐 <span style="color:#4a4a6a;font-weight:400;text-transform:none;letter-spacing:0">（一键对齐所有段落）</span></div>
+  <div class="row" style="margin-bottom:18px;gap:6px">
+    <button class="all-align-btn" id="tb-all-left">⬅ 全部左对齐</button>
+    <button class="all-align-btn" id="tb-all-center">☰ 全部居中</button>
+    <button class="all-align-btn" id="tb-all-right">➡ 全部右对齐</button>
+  </div>
+  <div class="slabel">上传 PDF 文件</div>
+  <div class="drop-zone" id="pdf-zone">
+    <input type="file" id="pdf-input" accept=".pdf">
+    <div class="drop-icon">📄</div>
+    <div class="drop-label">点击选择或拖放 PDF 文件</div>
+    <div class="drop-hint">仅支持 .pdf 格式</div>
+    <div class="file-name" id="pdf-name"></div>
+  </div>
+  <div class="slabel">转换模式</div>
+  <div class="mode-group">
+    <label class="mode-card active" id="card1">
+      <input type="radio" name="mode" value="1" checked>
+      <div class="mode-title">📐 保留原始格式</div>
+      <div class="mode-desc">还原排版、字体、表格和图片</div>
+    </label>
+    <label class="mode-card" id="card2">
+      <input type="radio" name="mode" value="2">
+      <div class="mode-title">🎨 应用参考模板</div>
+      <div class="mode-desc">使用参考 Word 格式，内容来自 PDF</div>
+    </label>
+  </div>
+  <div id="ref-section">
+    <div class="slabel">参考 Word 文档</div>
+    <div class="drop-zone" id="ref-zone">
+      <input type="file" id="ref-input" accept=".docx">
+      <div class="drop-icon">📝</div>
+      <div class="drop-label">点击选择或拖放参考 .docx</div>
+      <div class="drop-hint">仅参考格式，不使用其内容</div>
+      <div class="file-name" id="ref-name"></div>
+    </div>
+  </div>
+  <div class="slabel">输出文件夹</div>
+  <div class="row">
+    <input class="text-input" type="text" id="output-dir" placeholder="默认保存到下载文件夹" readonly>
+    <button class="btn-sm" id="pick-dir-btn">📁 选择文件夹</button>
+  </div>
+  <div class="slabel">输出文件名</div>
+  <div class="row">
+    <input class="text-input" type="text" id="output-name" placeholder="留空则使用原文件名">
+    <button class="btn-sm" id="reset-name-btn">↺</button>
+  </div>
+  <button class="convert-btn" id="convert-btn" disabled>开始转换</button>
+  <div class="progress-bar" id="progress-bar"><div class="progress-fill"></div></div>
+  <div class="status" id="status"></div>
+  <a class="download-btn" id="download-btn" href="#">⬇ 下载 Word 文档</a>
+</div></div>
+<!-- RIGHT -->
+<div class="panel-right">
+  <div class="preview-toolbar">
+    <span class="tb-label">缩放</span>
+    <button class="tb-btn" id="zoom-out">－</button>
+    <span class="zoom-label" id="zoom-label">100%</span>
+    <button class="tb-btn" id="zoom-in">＋</button>
+    <button class="tb-btn" id="zoom-fit">适应</button>
+    <div class="tb-sep"></div>
+    <span class="tb-label">格式</span>
+    <select class="tb-select" id="block-type-sel">
+      <option value="p">正文</option>
+      <option value="h1">标题1</option>
+      <option value="h2">标题2</option>
+    </select>
+    <button class="tb-btn" id="tb-bold"><b>B</b></button>
+    <button class="tb-btn" id="tb-italic"><i>I</i></button>
+    <div class="tb-sep"></div>
+    <span class="tb-label">对齐选中段</span>
+    <button class="tb-btn" id="tb-left">⬅</button>
+    <button class="tb-btn" id="tb-center">☰</button>
+    <button class="tb-btn" id="tb-right">➡</button>
+    <div class="tb-sep"></div>
+    <button class="tb-btn" id="compare-btn" disabled title="上传参考模板后启用">⚖ 对比模式</button>
+  </div>
+  <div class="preview-body" id="preview-body">
+    <div class="preview-empty">
+      <div class="preview-empty-icon">🗒️</div>
+      <div class="preview-empty-text">上传 PDF 后自动显示预览，可直接编辑</div>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+// ── State ──
+let pdfFile=null,refFile=null,currentMode='1';
+let currentJobId=null,originalBaseName='';
+let zoom=1.0,dirHandle=null;
+let refStyles=null,compareActive=false;
+let activeBlock=null,parsedBlocks=null;
+let selectedBlocks=new Set();
+
+// ── Elements ──
+const $ = id => document.getElementById(id);
+const pdfInput=$('pdf-input'), refInput=$('ref-input');
+const pdfZone=$('pdf-zone'), refZone=$('ref-zone');
+const pdfNameEl=$('pdf-name'), refNameEl=$('ref-name');
+const convertBtn=$('convert-btn'), downloadBtn=$('download-btn');
+const statusEl=$('status'), refSection=$('ref-section');
+const progressBar=$('progress-bar');
+const card1=$('card1'), card2=$('card2');
+const outputDir=$('output-dir'), outputName=$('output-name');
+const previewBody=$('preview-body');
+const zoomLabel=$('zoom-label'), blockTypeSel=$('block-type-sel');
+const compareBtn=$('compare-btn');
+
+// ── Mode toggle ──
+document.querySelectorAll('input[name=mode]').forEach(r=>{
+  r.addEventListener('change',()=>{
+    currentMode=r.value;
+    card1.classList.toggle('active',currentMode==='1');
+    card2.classList.toggle('active',currentMode==='2');
+    refSection.classList.toggle('visible',currentMode==='2');
+    updateBtn();
+  });
+});
+[card1,card2].forEach(c=>c.addEventListener('click',()=>{
+  c.querySelector('input').checked=true;
+  c.querySelector('input').dispatchEvent(new Event('change'));
+}));
+
+// ── Output folder picker ──
+$('pick-dir-btn').addEventListener('click',async()=>{
+  if(!window.showDirectoryPicker){alert('请使用 Chrome 或 Edge 浏览器以支持文件夹选择功能');return}
+  try{
+    dirHandle=await window.showDirectoryPicker({mode:'readwrite'});
+    outputDir.value=dirHandle.name;
+  }catch(e){if(e.name!=='AbortError') alert('选择文件夹失败：'+e.message)}
+});
+
+$('reset-name-btn').addEventListener('click',()=>{
+  outputName.value=originalBaseName?originalBaseName+'.docx':'';
+});
+
+// ── Drop zones ──
+function setupDrop(zone,input,onFile){
+  zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover')});
+  zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+  zone.addEventListener('drop',e=>{
+    e.preventDefault();zone.classList.remove('dragover');
+    if(e.dataTransfer.files[0]) onFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change',()=>{if(input.files[0]) onFile(input.files[0])});
+}
+
+setupDrop(pdfZone,pdfInput,f=>{
+  if(!f.name.toLowerCase().endsWith('.pdf')){setStatus('请上传 .pdf 格式文件','error');return}
+  pdfFile=f;
+  pdfNameEl.textContent=f.name;
+  pdfZone.classList.add('has-file');
+  originalBaseName=f.name.replace(/\.pdf$/i,'');
+  if(!outputName.value) outputName.value=originalBaseName+'.docx';
+  clearResult();
+  parsePdf(f);
+});
+
+setupDrop(refZone,refInput,async f=>{
+  if(!f.name.toLowerCase().endsWith('.docx')){setStatus('参考文件请上传 .docx 格式','error');return}
+  refFile=f;
+  refNameEl.textContent=f.name;
+  refZone.classList.add('has-file');
+  const form=new FormData();
+  form.append('ref_doc',f);
+  try{
+    const res=await fetch('/ref-styles',{method:'POST',body:form});
+    const data=await res.json();
+    if(data.styles){refStyles=data.styles;compareBtn.disabled=false;compareBtn.title='点击开启左右对比模式'}
+  }catch(e){}
+  updateBtn();
+});
+
+// ── Parse PDF ──
+async function parsePdf(file){
+  showPreviewMsg('⚙️','正在解析 PDF...',true);
+  const form=new FormData();
+  form.append('pdf_file',file);
+  try{
+    const res=await fetch('/parse',{method:'POST',body:form});
+    const data=await res.json();
+    if(data.error){showPreviewMsg('⚠️',data.error,false,'#ff6b8a');return}
+    currentJobId=data.job_id;
+    parsedBlocks=data.blocks;
+    renderPreview();
+    updateBtn();
+  }catch(e){
+    showPreviewMsg('⚠️','解析失败：'+e.message,false,'#ff6b8a');
+  }
+}
+
+// ── Render preview ──
+function renderPreview(){
+  if(!parsedBlocks) return;
+  if(compareActive&&refStyles) renderCompare();
+  else renderSingle();
+}
+
+function renderSingle(){
+  const wrap=document.createElement('div');
+  wrap.id='preview-container';
+  const zoomWrap=document.createElement('div');
+  zoomWrap.className='preview-zoom-wrap';
+  zoomWrap.id='zoom-wrap';
+  zoomWrap.style.transform=`scale(${zoom})`;
+  zoomWrap.appendChild(buildPage(parsedBlocks,true));
+  wrap.appendChild(zoomWrap);
+  previewBody.innerHTML='';
+  previewBody.appendChild(wrap);
+  updateZoomMargin();
+}
+
+function renderCompare(){
+  const wrap=document.createElement('div');
+  wrap.className='compare-wrap';
+  wrap.id='preview-container';
+  const colL=document.createElement('div');
+  colL.className='compare-col';colL.id='col-original';
+  const lblL=document.createElement('div');
+  lblL.className='compare-col-label label-original';lblL.textContent='原始格式';
+  colL.appendChild(lblL);
+  const zwL=document.createElement('div');
+  zwL.className='preview-zoom-wrap';zwL.style.transform=`scale(${zoom})`;
+  zwL.appendChild(buildPage(parsedBlocks,true));
+  colL.appendChild(zwL);
+  const colR=document.createElement('div');
+  colR.className='compare-col';colR.id='col-template';
+  const lblR=document.createElement('div');
+  lblR.className='compare-col-label label-template';lblR.textContent='应用模板后';
+  colR.appendChild(lblR);
+  const zwR=document.createElement('div');
+  zwR.className='preview-zoom-wrap';zwR.style.transform=`scale(${zoom})`;
+  zwR.appendChild(buildPage(parsedBlocks,false,refStyles));
+  colR.appendChild(zwR);
+  colL.addEventListener('scroll',()=>{colR.scrollTop=colL.scrollTop});
+  colR.addEventListener('scroll',()=>{colL.scrollTop=colR.scrollTop});
+  wrap.appendChild(colL);wrap.appendChild(colR);
+  previewBody.innerHTML='';previewBody.appendChild(wrap);
+}
+
+function buildPage(blocksData,editable,applyRefStyles){
+  const page=document.createElement('div');
+  page.className='preview-page'+(applyRefStyles&&!editable?' template-view':'');
+  if(editable) page.contentEditable='true';
+
+  if(blocksData.scanned){
+    const msg=document.createElement('p');
+    msg.style.cssText='color:#888;font-style:italic;text-align:center;padding:20px';
+    msg.textContent='扫描件 PDF，转换后可预览';
+    page.appendChild(msg);
+    return page;
+  }
+
+  (blocksData.pages||[]).forEach((pg,pi)=>{
+    if(pi>0){
+      const hr=document.createElement('hr');
+      hr.style.cssText='border:none;border-top:2px dashed #ddd;margin:20px 0;pointer-events:none';
+      page.appendChild(hr);
+    }
+    (pg.blocks||[]).forEach(block=>{
+      const el=document.createElement('div');
+      el.className='block-'+block.type;
+      el.dataset.type=block.type;
+      el.dataset.align=block.align||'left';
+      el.style.textAlign=block.align||'left';
+      if(applyRefStyles){
+        const styleMap={'h1':'Heading 1','h2':'Heading 2','p':'Normal'};
+        const rs=applyRefStyles[styleMap[block.type]||'Normal']||{};
+        if(rs.font_name) el.style.fontFamily=rs.font_name;
+        if(rs.font_size) el.style.fontSize=rs.font_size+'pt';
+        if(rs.bold===true) el.style.fontWeight='700';
+        if(rs.color&&rs.color!=='#000000') el.style.color=rs.color;
+        if(rs.space_before) el.style.marginTop=rs.space_before+'pt';
+        if(rs.space_after) el.style.marginBottom=rs.space_after+'pt';
+        if(rs.line_spacing) el.style.lineHeight=rs.line_spacing+'pt';
+      }
+      const html=(block.runs||[]).map(r=>{
+        let s='';
+        if(r.bold) s+='font-weight:700;';
+        if(r.italic) s+='font-style:italic;';
+        if(r.size&&!applyRefStyles) s+=`font-size:${r.size}pt;`;
+        if(r.color&&r.color!=='#000000'&&!applyRefStyles) s+=`color:${r.color};`;
+        const t=r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return s?`<span style="${s}">${t}</span>`:t;
+      }).join('');
+      el.innerHTML=html||'&nbsp;';
+      page.appendChild(el);
+    });
+  });
+
+  if(editable) setupDragSelect(page);
+  return page;
+}
+
+// ── Drag-select blocks ──
+function clearBlockSelection(){
+  selectedBlocks.forEach(b=>b.classList.remove('block-selected'));
+  selectedBlocks.clear();
+}
+
+function setupDragSelect(page){
+  let dragging=false,startX=0,startY=0,box=null;
+
+  page.addEventListener('mousedown',e=>{
+    if(e.detail>=2){page.classList.add('editing-mode');clearBlockSelection();return}
+    if(page.classList.contains('editing-mode')) return;
+    e.preventDefault();
+    dragging=true;startX=e.clientX;startY=e.clientY;
+    box=document.createElement('div');
+    box.className='drag-sel-box';
+    box.style.cssText=`left:${startX}px;top:${startY}px;width:0;height:0`;
+    document.body.appendChild(box);
+    clearBlockSelection();
+  });
+
+  document.addEventListener('mousemove',e=>{
+    if(!dragging||!box) return;
+    const x=Math.min(e.clientX,startX),y=Math.min(e.clientY,startY);
+    const w=Math.abs(e.clientX-startX),h=Math.abs(e.clientY-startY);
+    box.style.cssText=`left:${x}px;top:${y}px;width:${w}px;height:${h}px`;
+    const minY=Math.min(e.clientY,startY),maxY=Math.max(e.clientY,startY);
+    clearBlockSelection();
+    page.querySelectorAll('[data-type]').forEach(bl=>{
+      const br=bl.getBoundingClientRect();
+      if(br.top<maxY&&br.bottom>minY){bl.classList.add('block-selected');selectedBlocks.add(bl)}
+    });
+  });
+
+  document.addEventListener('mouseup',e=>{
+    if(!dragging) return;
+    dragging=false;
+    if(box){box.remove();box=null}
+    if(selectedBlocks.size===0){
+      let node=e.target;
+      while(node&&node!==page){
+        if(node.dataset&&node.dataset.type){activeBlock=node;syncToolbar(node);break}
+        node=node.parentNode;
+      }
+    }
+  });
+
+  page.addEventListener('click',e=>{
+    if(!e.target.closest('[data-type]')) page.classList.remove('editing-mode');
+  });
+  page.addEventListener('keyup',()=>updateActiveBlock());
+}
+
+// ── Toolbar sync ──
+function syncToolbar(el){blockTypeSel.value=el.dataset.type||'p'}
+
+function updateActiveBlock(){
+  const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0) return;
+  let node=sel.anchorNode;
+  while(node&&node!==document.body){
+    if(node.nodeType===1&&node.dataset&&node.dataset.type){activeBlock=node;syncToolbar(node);return}
+    node=node.parentNode;
+  }
+}
+
+// ── Toolbar actions ──
+$('tb-bold').addEventListener('mousedown',e=>e.preventDefault());
+$('tb-italic').addEventListener('mousedown',e=>e.preventDefault());
+$('tb-bold').addEventListener('click',()=>document.execCommand('bold'));
+$('tb-italic').addEventListener('click',()=>document.execCommand('italic'));
+
+function applyAlignToSelection(align){
+  if(selectedBlocks.size>0){
+    selectedBlocks.forEach(bl=>{bl.style.textAlign=align;bl.dataset.align=align});
+    return;
+  }
+  if(activeBlock){activeBlock.style.textAlign=align;activeBlock.dataset.align=align}
+}
+
+function applyAlignToAll(align){
+  document.querySelectorAll(
+    '#col-original [data-type], .preview-page:not(.template-view) [data-type]'
+  ).forEach(block=>{block.style.textAlign=align;block.dataset.align=align});
+}
+
+$('tb-left').addEventListener('mousedown',e=>e.preventDefault());
+$('tb-center').addEventListener('mousedown',e=>e.preventDefault());
+$('tb-right').addEventListener('mousedown',e=>e.preventDefault());
+$('tb-left').addEventListener('click',()=>applyAlignToSelection('left'));
+$('tb-center').addEventListener('click',()=>applyAlignToSelection('center'));
+$('tb-right').addEventListener('click',()=>applyAlignToSelection('right'));
+$('tb-all-left').addEventListener('click',()=>applyAlignToAll('left'));
+$('tb-all-center').addEventListener('click',()=>applyAlignToAll('center'));
+$('tb-all-right').addEventListener('click',()=>applyAlignToAll('right'));
+
+blockTypeSel.addEventListener('change',()=>{
+  if(!activeBlock) return;
+  const t=blockTypeSel.value;
+  activeBlock.className='block-'+t;
+  activeBlock.dataset.type=t;
+});
+
+// ── Compare toggle ──
+compareBtn.addEventListener('click',()=>{
+  if(!refStyles) return;
+  compareActive=!compareActive;
+  compareBtn.classList.toggle('active',compareActive);
+  compareBtn.textContent=compareActive?'✕ 关闭对比':'⚖ 对比模式';
+  renderPreview();
+});
+
+// ── Zoom ──
+function updateZoomMargin(){
+  const zw=document.getElementById('zoom-wrap');
+  if(!zw) return;
+  const page=zw.querySelector('.preview-page');
+  if(!page) return;
+  const h=page.offsetHeight;
+  zw.style.marginBottom=((zoom-1)*h)+'px';
+  zw.style.marginRight=((zoom-1)*816)+'px';
+}
+
+function setZoom(z){
+  zoom=Math.max(.3,Math.min(2,z));
+  zoomLabel.textContent=Math.round(zoom*100)+'%';
+  document.querySelectorAll('.preview-zoom-wrap').forEach(zw=>{zw.style.transform=`scale(${zoom})`});
+  updateZoomMargin();
+}
+
+$('zoom-in').addEventListener('click',()=>setZoom(zoom+.1));
+$('zoom-out').addEventListener('click',()=>setZoom(zoom-.1));
+$('zoom-fit').addEventListener('click',()=>{
+  const pw=previewBody.clientWidth-(compareActive?96:48);
+  const pageW=8.5*96;
+  setZoom(pw/pageW/(compareActive?2:1));
+});
+
+// ── Read blocks from DOM ──
+function readBlocksFromDom(){
+  const pages=[];
+  const pageEls=document.querySelectorAll('.preview-page:not(.template-view)');
+  pageEls.forEach(pageEl=>{
+    const blocks=[];
+    pageEl.querySelectorAll('[data-type]').forEach(el=>{
+      const type=el.dataset.type||'p';
+      const align=el.dataset.align||el.style.textAlign||'left';
+      const runs=[];
+      el.childNodes.forEach(node=>{
+        if(node.nodeType===3){
+          const t=node.textContent.trim();
+          if(t) runs.push({text:t,bold:false,italic:false,size:12,color:'#000000'});
+        } else if(node.nodeType===1){
+          const cs=window.getComputedStyle(node);
+          const t=node.textContent;
+          if(!t.trim()) return;
+          runs.push({text:t,bold:cs.fontWeight>='600',italic:cs.fontStyle==='italic',size:parseFloat(cs.fontSize)||12,color:node.style.color||'#000000'});
+        }
+      });
+      if(!runs.length){const t=el.textContent.trim();if(t) runs.push({text:t,bold:false,italic:false,size:12,color:'#000000'})}
+      if(runs.length) blocks.push({type,align,runs});
+    });
+    pages.push({blocks});
+  });
+  return {pages};
+}
+
+// ── Convert ──
+convertBtn.addEventListener('click',async()=>{
+  if(!currentJobId){setStatus('请先上传 PDF 文件','error');return}
+  convertBtn.disabled=true;
+  downloadBtn.classList.remove('visible');
+  progressBar.classList.add('visible');
+  statusEl.innerHTML='<span class="spinner"></span>正在转换...';
+  statusEl.className='status';
+  const customName=outputName.value.trim();
+  const finalName=customName?(customName.toLowerCase().endsWith('.docx')?customName:customName+'.docx'):(originalBaseName+'.docx');
+  const form=new FormData();
+  form.append('job_id',currentJobId);
+  form.append('mode',currentMode);
+  form.append('blocks',JSON.stringify(readBlocksFromDom()));
+  form.append('original_name',originalBaseName);
+  if(currentMode==='2'&&refFile) form.append('ref_doc',refFile);
+  try{
+    const res=await fetch('/convert',{method:'POST',body:form});
+    const data=await res.json();
+    progressBar.classList.remove('visible');
+    if(!res.ok||data.error){setStatus(data.error||'转换失败','error');return}
+    const dlUrl=`/download/${data.download_id}?name=${encodeURIComponent(finalName)}`;
+    if(dirHandle&&window.showDirectoryPicker){
+      try{
+        const fh=await dirHandle.getFileHandle(finalName,{create:true});
+        const wr=await fh.createWritable();
+        const blob=await fetch(dlUrl).then(r=>r.blob());
+        await wr.write(blob);await wr.close();
+        setStatus(`✓ 已保存到 ${dirHandle.name}/${finalName}`,'success');
+        downloadBtn.href=dlUrl;downloadBtn.setAttribute('download',finalName);downloadBtn.classList.add('visible');
+        return;
+      }catch(e){console.warn('folder save failed',e)}
+    }
+    downloadBtn.href=dlUrl;downloadBtn.setAttribute('download',finalName);downloadBtn.classList.add('visible');
+    setStatus('转换成功！点击下方按钮下载','success');
+  }catch(e){
+    progressBar.classList.remove('visible');
+    setStatus('连接失败，请确认程序正在运行','error');
+  }finally{convertBtn.disabled=false;updateBtn()}
+});
+
+// ── Helpers ──
+function updateBtn(){convertBtn.disabled=!pdfFile||(currentMode==='2'&&!refFile)||!currentJobId}
+function setStatus(msg,type=''){statusEl.textContent=msg;statusEl.className='status '+type}
+function clearResult(){
+  downloadBtn.classList.remove('visible');downloadBtn.href='#';setStatus('');
+  currentJobId=null;parsedBlocks=null;compareActive=false;
+  compareBtn.classList.remove('active');compareBtn.textContent='⚖ 对比模式';compareBtn.disabled=true;refStyles=null;
+}
+function showPreviewMsg(icon,text,spin,color){
+  previewBody.innerHTML=`<div class="preview-empty">
+    <div class="preview-empty-icon" style="${spin?'animation:spin 1s linear infinite;display:inline-block':''}">${icon}</div>
+    <div class="preview-empty-text" style="${color?'color:'+color:''}">${text}</div>
+  </div>`;
+}
+</script>
+</body>
+</html>
