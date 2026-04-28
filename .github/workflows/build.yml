@@ -1,0 +1,51 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [main]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        pyinstaller --onefile --windowed --name "PDF转Word" launcher.py
+    
+    - name: Create Release
+      if: github.event_name == 'release'
+      run: |
+        $version = $github.event.release.tag_name
+        7z a "PDF转Word-$version.zip" ./dist/*
+        Write-Host "## 检查输出" $version
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PDF转Word-Windows
+        path: dist/PDF转Word.exe
+        retention-days: 30
+    
+    - name: Upload to Release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/PDF转Word.exe
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
