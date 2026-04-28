@@ -1,6 +1,7 @@
 name: Build Windows Executable
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   release:
